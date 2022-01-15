@@ -11,27 +11,6 @@ app.use(express.static('public'))
 //databse connection
 mongoose.connect('mongodb://localhost:27017/jigsawDB', { useNewUrlParser: true })
 
-//budgetschema
-const budgetSchema = new mongoose.Schema({
-	id: Number,
-	amount: Number,
-	timeperiod: String,
-	sector: String,
-})
-
-const Budget = mongoose.model('Budget', budgetSchema)
-
-//view budget data
-app.get('/budget', (req, res) => {
-	Budget.find(function (err, foundBudget) {
-		if (!err) {
-			res.send(foundBudget)
-		} else {
-			res.send(err)
-		}
-	})
-})
-
 //investschema
 const investmentSchema = new mongoose.Schema({
 	id: Number,
@@ -42,35 +21,22 @@ const investmentSchema = new mongoose.Schema({
 
 const Investment = mongoose.model('Investment', investmentSchema)
 
-//view investment data
-app.get('/invest', (req, res) => {
-	Investment.find(function (err, foundInvestments) {
-		if (!err) {
-			res.send(foundInvestments)
-		} else {
-			res.send(err)
-		}
-	})
-})
-
 //query handling
-
 Investment.find(function (err, foundInvestments) {
 	if (!err) {
 		let totalBudget = 0,
 			monthBudget = 0,
 			quarterBudget = 0,
-			ecommerceBudget = 0;
+			ecommerceBudget = 0
 
 		const a = foundInvestments.map((investments) => {
 			totalBudget += investments.amount
-			if (totalBudget <= 350) {
-				monthBudget += investments.amount
+			if (totalBudget < 350) {
 				//Jan
 				if (
 					moment(investments.date).format('YYYY-MM-DD') >= '2020-01-01' &&
 					moment(investments.date).format('YYYY-MM-DD') <= '2020-01-31' &&
-					monthBudget <= 70
+					monthBudget <= 75
 				) {
 					if (investments.sector === 'ecommerce') {
 						ecommerceBudget += investments.amount
@@ -85,47 +51,52 @@ Investment.find(function (err, foundInvestments) {
 							quarterBudget <= 25
 						) {
 							return investments
+						} else {
+							quarterBudget -= investments.amount
 						}
 					} else if (investments.sector === 'fintech') {
 						if (investments.amount <= 30) return investments
 					} else {
-						monthBudget=0;
 						return investments
 					}
 				}
 				//Feb
 				else if (
 					moment(investments.date).format('YYYY-MM-DD') >= '2020-02-01' &&
-					moment(investments.date).format('YYYY-MM-DD') <= '2020-02-31' &&
-					monthBudget <= 70
+					moment(investments.date).format('YYYY-MM-DD') <= '2020-02-29'
 				) {
-					console.log('feb:'+monthBudget)
-					if (investments.sector === 'ecommerce') {
-						ecommerceBudget += investments.amount
-						if (ecommerceBudget <= 70) {
+					monthBudget+=investments.amount
+					if(monthBudget <= 75){
+						if (investments.sector === 'ecommerce') {
+							ecommerceBudget += investments.amount
+							if (ecommerceBudget <= 70) {
+								return investments
+							}
+						} else if (investments.sector === 'bigdata') {
+							quarterBudget += investments.amount
+							if (
+								moment(investments.date).format('YYYY-MM-DD') >= '2020-01-01' &&
+								moment(investments.date).format('YYYY-MM-DD') <= '2020-03-31' &&
+								quarterBudget <= 25
+							) {
+								return investments
+							} else {
+								quarterBudget -= investments.amount
+							}
+						} else if (investments.sector === 'fintech') {
+							if (investments.amount <= 30) return investments
+						} else {
 							return investments
 						}
-					} else if (investments.sector === 'bigdata') {
-						quarterBudget += investments.amount
-						if (
-							moment(investments.date).format('YYYY-MM-DD') >= '2020-01-01' &&
-							moment(investments.date).format('YYYY-MM-DD') <= '2020-03-31' &&
-							quarterBudget <= 25
-						) {
-							return investments
-						}
-					} else if (investments.sector === 'fintech') {
-						if (investments.amount <= 30) return investments
-					} else {
-						monthBudget=0;
-						return investments
+					} else{
+						monthBudget -= investments.amount
 					}
 				}
 				//March
 				else if (
 					moment(investments.date).format('YYYY-MM-DD') >= '2020-03-01' &&
 					moment(investments.date).format('YYYY-MM-DD') <= '2020-03-31' &&
-					monthBudget <= 70
+					monthBudget <= 75
 				) {
 					if (investments.sector === 'ecommerce') {
 						ecommerceBudget += investments.amount
@@ -140,6 +111,8 @@ Investment.find(function (err, foundInvestments) {
 							quarterBudget <= 25
 						) {
 							return investments
+						} else {
+							quarterBudget -= investments.amount
 						}
 					} else if (investments.sector === 'fintech') {
 						if (investments.amount <= 30) return investments
@@ -151,9 +124,9 @@ Investment.find(function (err, foundInvestments) {
 				else if (
 					moment(investments.date).format('YYYY-MM-DD') >= '2020-04-01' &&
 					moment(investments.date).format('YYYY-MM-DD') <= '2020-04-30' &&
-					monthBudget <= 70
-				) {	
-					quarterBudget = 0		
+					monthBudget <= 75
+				) {
+					quarterBudget = 0
 					if (investments.sector === 'ecommerce') {
 						ecommerceBudget += investments.amount
 						if (ecommerceBudget <= 70) {
@@ -172,6 +145,7 @@ Investment.find(function (err, foundInvestments) {
 						if (ecommerceBudget <= 70) {
 							return investments
 						}
+						ecommerceBudget -= investments.amount
 					} else if (investments.sector === 'fintech') {
 						if (investments.amount <= 30) return investments
 					} else {
@@ -182,13 +156,16 @@ Investment.find(function (err, foundInvestments) {
 			}
 			totalBudget -= investments.amount
 		})
-		console.log(a)
-		console.log(totalBudget, quarterBudget, monthBudget)
+		//filter output since the logic is for those investments that comply the rule
+		const res = a.map((items,index) => {
+			if(items === undefined) return index+1
+		}).filter((item) => (item>0));
+		console.log(res)
 	} else {
 		res.send(err)
 	}
 })
 
 app.listen(3000, function () {
-	console.log('Server started on port 3000')
+	console.log('Hope, you are having a good day. Here is your output, do update me in case of any suggestions.')
 })
